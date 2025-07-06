@@ -1,5 +1,5 @@
-﻿using System.Globalization;
-using System.Numerics;
+﻿using System.Data;
+using System.Globalization;
 
 namespace Cliex
 {
@@ -20,7 +20,11 @@ namespace Cliex
         Float,
         Double,
         Decimal,
-        Boolean
+        Boolean,
+        Null,
+        List,
+        Tuple,
+        Dictionary
     }
 
     public class Token
@@ -47,6 +51,11 @@ namespace Cliex
         public bool IsNumber()
         {
             return IsInteger() || IsFloat();
+        }
+
+        public bool IsCollection()
+        {
+            return Type.HasFlag(Tokens.List | Tokens.Tuple | Tokens.Dictionary);
         }
 
         public override string ToString()
@@ -105,7 +114,18 @@ namespace Cliex
                     Advance();
                     result.Add(GenerateChar());
                 }
-                else Advance();
+                else if (Current == '[')
+                {
+                    Advance();
+                    result.Add(GenerateList());
+                }
+                else if (Current == '(')
+                {
+                    Advance();
+                    // result.Add(GenerateTuple());
+                }
+                else if (" \t\n".Contains(Current)) Advance();
+                else throw new SyntaxErrorException($"Unknown character: \'{Current}\'.");
             }
 
             return result;
@@ -121,6 +141,8 @@ namespace Cliex
                 
                 Advance();
             }
+            
+            if (result == "null") return new(Tokens.Null, null);
 
             if (result == "true") return new(Tokens.Boolean, true);
 
@@ -338,5 +360,68 @@ namespace Cliex
 
             return new(type, number);
         }
+
+        private Token GenerateList()
+        {
+            List<Token> result = new();
+            bool comma = false;
+
+            while (Current != '\0' && Current != ']')
+            {
+                if (result.Count > 0 && !comma) throw new SyntaxErrorException("Cannot generate list: comma expected.");
+
+                char next = Index + 1 < Source.Length ? Source[Index + 1] : '\0';
+                comma = false;
+
+                if ((Alphas + "-_").Contains(Current))
+                {
+                    result.Add(GenerateIdentifier());
+                }
+                else if (Digits.Contains(Current) || (Current == '.' && Digits.Contains(next)))
+                {
+                    result.Add(GenerateNumber());
+                }
+                else if (Current == '\"')
+                {
+                    Advance();
+                    result.Add(GenerateString());
+                }
+                else if (Current == '\'')
+                {
+                    Advance();
+                    result.Add(GenerateChar());
+                }
+                else if (Current == '[')
+                {
+                    Advance();
+                    result.Add(GenerateList());
+                }
+                else if (Current == '(')
+                {
+                    Advance();
+                    // result.Add(GenerateTuple());
+                }
+                else if (Current == ',')
+                {
+                    if (comma) throw new SyntaxErrorException("Cannot generate list: list already have a comma.");
+
+                    comma = true;
+                }
+                else if (" \t\n".Contains(Current)) Advance();
+                else throw new SyntaxErrorException($"Unknown character: \'{Current}\'.");
+            }
+
+            return new(Tokens.List, result);
+        }
+
+        // private Token GenerateTuple()
+        // {
+        //     
+        // }
+        //
+        // private Token GenerateDictionary()
+        // {
+        //     
+        // }
     }
 }
