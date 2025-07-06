@@ -1,33 +1,30 @@
-﻿namespace Cliex
+﻿using Spectre.Console;
+using Spectre.Console.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace Cliex
 {
-    public static class Variables
+    public static class Init
     {
-        private static Dictionary<string, object?> Storage => new();
-
-        public static void SetVariable(string name, object? value, bool update = true)
+        public static void Main(string[] args)
         {
-            if (Storage.ContainsKey(name) && !update) return;
+            string source = "cliex \"Hello, World!\" \'1\' 123456 123.456 true false";
+            Lexer lexer = new(source);
+            List<Token> result = lexer.Analyse();
+            JsonSerializerOptions options = new()
+            {
+                Converters = { new JsonStringEnumConverter() },
+                NumberHandling = JsonNumberHandling.AllowReadingFromString,
+                WriteIndented = true
+            };
+            string json = JsonSerializer.Serialize(result, options);
+            JsonText text = new JsonText(json);
 
-            Storage[name] = value;
-        }
-
-        public static object? GetVariable(string name, object? def = null)
-        {
-            return Storage[name] ?? def;
-        }
-
-        public static TValue? GetVariable<TValue>(string name, TValue? def = default)
-        {
-            if (Storage[name] is TValue value) return value;
-
-            return def;
-        }
-
-        public static bool HasVariable(string name)
-        {
-            return Storage.ContainsKey(name);
+            text.BracketsStyle = new(Color.Yellow);
+            text.BracesStyle = new(Color.Yellow);
+            
+            AnsiConsole.Write(text);
         }
     }
-    
-    
 }
