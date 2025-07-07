@@ -9,12 +9,14 @@ namespace Cliex
     {
         public static void Main(string[] args)
         {
-            string source = "cliex \"Hello, World!\" \'1\' 123456 123.456 true false";
+            Variables.SetVariable("PI", double.Pi);
+            
+            string source = "$PI {\"A\": \"Apple\", \"B\": \"Banana\"}";
             Lexer lexer = new(source);
             List<Token> result = lexer.Analyse();
             JsonSerializerOptions options = new()
             {
-                Converters = { new JsonStringEnumConverter() },
+                Converters = { new JsonStringEnumConverter(), new JsonTokenConverter(), },
                 NumberHandling = JsonNumberHandling.AllowReadingFromString,
                 WriteIndented = true
             };

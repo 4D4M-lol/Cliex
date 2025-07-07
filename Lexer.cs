@@ -1,26 +1,32 @@
-﻿using System.Globalization;
-using System.Numerics;
+﻿using System.Data;
+using System.Globalization;
 
 namespace Cliex
 {
     [Flags]
     public enum Tokens
     {
-        Identifier,
-        String,
-        Char,
-        Byte,
-        SByte,
-        UShort,
-        Short,
-        Int,
-        UInt,
-        Long,
-        ULong,
-        Float,
-        Double,
-        Decimal,
-        Boolean
+        Operator = 0,
+        Identifier = 1,
+        String = 2,
+        Char = 4,
+        Byte = 8,
+        SByte = 16,
+        UShort = 32,
+        Short = 64,
+        Int = 128,
+        UInt = 256,
+        Long = 512,
+        ULong = 1024,
+        Float = 2048,
+        Double = 4096,
+        Decimal = 8192,
+        Boolean = 16384,
+        Null = 32768,
+        List = 65536,
+        Dictionary = 131072,
+        Variable = 262144,
+        Function = 5124288
     }
 
     public class Token
@@ -49,6 +55,11 @@ namespace Cliex
             return IsInteger() || IsFloat();
         }
 
+        public bool IsCollection()
+        {
+            return Type.HasFlag(Tokens.List | Tokens.Dictionary);
+        }
+
         public override string ToString()
         {
             return $"\"{Type}\" : {Value}";
@@ -59,6 +70,7 @@ namespace Cliex
     {
         private static string Alphas { get; } = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
         private static string Digits { get; } = "0123456789";
+        private static string Operators { get; } = "+-*/^%|&!";
         
         public string Source { get; private set; }
         public char Current { get; private set; }
@@ -95,6 +107,11 @@ namespace Cliex
                 {
                     result.Add(GenerateNumber());
                 }
+                else if (Operators.Contains(Current))
+                {
+                    result.Add(new (Tokens.Operator, Current));
+                    Advance();
+                }
                 else if (Current == '\"')
                 {
                     Advance();
@@ -105,7 +122,23 @@ namespace Cliex
                     Advance();
                     result.Add(GenerateChar());
                 }
-                else Advance();
+                else if (Current == '[')
+                {
+                    Advance();
+                    result.Add(GenerateList());
+                }
+                else if (Current == '{')
+                {
+                    Advance();
+                    result.Add(GenerateDictionary());
+                }
+                else if (Current == '$')
+                {
+                    Advance();
+                    result.Add(GenerateVariable());
+                }
+                else if (" \t\n".Contains(Current)) Advance();
+                else throw new CliexSyntaxError($"Unknown character: \'{Current}\'.");
             }
 
             return result;
@@ -121,6 +154,8 @@ namespace Cliex
                 
                 Advance();
             }
+            
+            if (result == "null") return new(Tokens.Null, null);
 
             if (result == "true") return new(Tokens.Boolean, true);
 
@@ -156,7 +191,7 @@ namespace Cliex
                         case '\\': result += '\\'; Advance(); continue;
                         case '\'': result += '\''; Advance(); continue;
                         case '\"': result += '\"'; Advance(); continue;
-                        default: throw new NotImplementedException($"Unknown escape character: \'{Current}\'.");
+                        default: throw new CliexCharacterError($"Unknown escape character: \'{Current}\'.");
                     }
                     
                     escaping = false;
@@ -189,14 +224,14 @@ namespace Cliex
                     case '\\': result = '\\'; Advance(); break;
                     case '\'': result = '\''; Advance(); break;
                     case '\"': result = '\"'; Advance(); break;
-                    default: throw new NotImplementedException($"Unknown escape character: \'{Current}\'.");
+                    default: throw new CliexCharacterError($"Unknown escape character: \'{Current}\'.");
                 }
             }
             else result = Current;
             
             Advance();
 
-            if (Current != '\'') throw new ArgumentOutOfRangeException($"Character can only contains one character.");
+            if (Current != '\'') throw new CliexOverflowError($"Character can only contains one character.");
             
             Advance();
 
@@ -239,64 +274,56 @@ namespace Cliex
             switch (result[^1])
             {
                 case 'b':
-                    if (!byte.TryParse(result[..^1], out byte byteValue))
-                        throw new OverflowException($"Invalid byte value: {byteValue}, a byte can only be between from 0 to 255.");
+                    if (!byte.TryParse(result[..^1], out byte byteValue)) throw new CliexOverflowError($"Invalid byte value: {byteValue}, a byte can only be between from 0 to 255.");
 
                     type = Tokens.Byte;
                     number = byteValue;
                     
                     break;
                 case 'B':
-                    if (!sbyte.TryParse(result[..^1], out sbyte sbyteValue))
-                        throw new OverflowException($"Invalid sbyte value: {sbyteValue}, an sbyte can only be between from -128 to 127.");
+                    if (!sbyte.TryParse(result[..^1], out sbyte sbyteValue)) throw new CliexOverflowError($"Invalid sbyte value: {sbyteValue}, an sbyte can only be between from -128 to 127.");
 
                     type = Tokens.SByte;
                     number = sbyteValue;
                     
                     break;
                 case 's':
-                    if (!ushort.TryParse(result[..^1], out ushort ushortValue))
-                        throw new OverflowException($"Invalid ushort value: {ushortValue}, a ushort can only be between from 0 to 65,535.");
+                    if (!ushort.TryParse(result[..^1], out ushort ushortValue)) throw new CliexOverflowError($"Invalid ushort value: {ushortValue}, a ushort can only be between from 0 to 65,535.");
 
                     type = Tokens.UShort;
                     number = ushortValue;
                     
                     break;
                 case 'S':
-                    if (!short.TryParse(result[..^1], out short shortValue))
-                        throw new OverflowException($"Invalid short value: {shortValue}, a short can only be between from -32,768 to 32,767.");
+                    if (!short.TryParse(result[..^1], out short shortValue)) throw new CliexOverflowError($"Invalid short value: {shortValue}, a short can only be between from -32,768 to 32,767.");
 
                     type = Tokens.Short;
                     number = shortValue;
                     
                     break;
                 case 'i':
-                    if (!uint.TryParse(result[..^1], out uint uintValue))
-                        throw new OverflowException($"Invalid uint value: {uintValue}, a uint can only be between from 0 to 4,294,967,295.");
+                    if (!uint.TryParse(result[..^1], out uint uintValue)) throw new CliexOverflowError($"Invalid uint value: {uintValue}, a uint can only be between from 0 to 4,294,967,295.");
 
                     type = Tokens.UInt;
                     number = uintValue;
                     
                     break;
                 case 'I':
-                    if (!int.TryParse(result[..^1], out int intValue))
-                        throw new OverflowException($"Invalid int value: {intValue}, an int can only be between from -2,147,483,648 to 2,147,483,647.");
+                    if (!int.TryParse(result[..^1], out int intValue)) throw new CliexOverflowError($"Invalid int value: {intValue}, an int can only be between from -2,147,483,648 to 2,147,483,647.");
 
                     type = Tokens.Int;
                     number = intValue;
                     
                     break;
                 case 'l':
-                    if (!ulong.TryParse(result[..^1], out ulong ulongValue))
-                        throw new OverflowException($"Invalid ulong value: {ulongValue}, a ulong can only be between from 0 to 18,446,744,073,709,551,615.");
+                    if (!ulong.TryParse(result[..^1], out ulong ulongValue)) throw new CliexOverflowError($"Invalid ulong value: {ulongValue}, a ulong can only be between from 0 to 18,446,744,073,709,551,615.");
 
                     type = Tokens.ULong;
                     number = ulongValue;
                     
                     break;
                 case 'L':
-                    if (!long.TryParse(result[..^1], out long longValue))
-                        throw new OverflowException($"Invalid long value: {longValue}, a long can only be between from -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807.");
+                    if (!long.TryParse(result[..^1], out long longValue)) throw new CliexOverflowError($"Invalid long value: {longValue}, a long can only be between from -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807.");
 
                     type = Tokens.Long;
                     number = longValue;
@@ -321,8 +348,8 @@ namespace Cliex
                 default:
                     if (!dotted)
                     {
-                        if (!int.TryParse(result[..^1], out intValue))
-                            throw new OverflowException($"Invalid int value: {intValue}, an int can only be between from -2,147,483,648 to 2,147,483,647.");
+                        if (!int.TryParse(result, out intValue))
+                            throw new CliexOverflowError($"Invalid int value: {intValue}, an int can only be between from -2,147,483,648 to 2,147,483,647.");
 
                         type = Tokens.Int;
                         number = intValue;
@@ -337,6 +364,206 @@ namespace Cliex
             }
 
             return new(type, number);
+        }
+
+        private Token GenerateList()
+        {
+            List<Token> result = new();
+            bool commaExpected = false;
+
+            while (" \t\n".Contains(Current)) Advance();
+
+            if (Current == ']')
+            {
+                Advance();
+                
+                return new Token(Tokens.List, result);
+            }
+
+            while (Current != '\0' && Current != ']')
+            {
+                if (commaExpected)
+                {
+                    if (Current != ',') throw new CliexSyntaxError("Cannot generate list: comma expected.");
+            
+                    Advance();
+                    
+                    commaExpected = false;
+            
+                    while (" \t\n".Contains(Current)) Advance();
+                    
+                    if (Current == ']') break;
+                }
+
+                if ((Alphas + "-_").Contains(Current))
+                {
+                    result.Add(GenerateIdentifier());
+                    
+                    commaExpected = true;
+                }
+                else if (Digits.Contains(Current) || (Current == '.' && Index + 1 < Source.Length && Digits.Contains(Source[Index + 1])))
+                {
+                    result.Add(GenerateNumber());
+                    
+                    commaExpected = true;
+                }
+                else if (Current == '\"')
+                {
+                    Advance();
+                    result.Add(GenerateString());
+                    
+                    commaExpected = true;
+                }
+                else if (Current == '\'')
+                {
+                    Advance();
+                    result.Add(GenerateChar());
+                    
+                    commaExpected = true;
+                }
+                else if (Current == '[')
+                {
+                    Advance();
+                    result.Add(GenerateList());
+                    
+                    commaExpected = true;
+                }
+                else if (Current == '{')
+                {
+                    Advance();
+                    result.Add(GenerateDictionary());
+                    
+                    commaExpected = true;
+                }
+                else if (Current == '$')
+                {
+                    Advance();
+                    result.Add(GenerateVariable());
+                }
+                else if (" \t\n".Contains(Current)) 
+                {
+                    Advance();
+                }
+                else if (Current == ',') throw new CliexSyntaxError("Unexpected comma in list.");
+                else throw new CliexSyntaxError($"Unknown character: '{Current}'.");
+            }
+
+            if (Current == ']') Advance();
+            else throw new CliexSyntaxError("List not properly closed: expected ']'.");
+
+            return new Token(Tokens.List, result);
+        }
+
+        public Token GenerateDictionary()
+        {
+            Dictionary<Token, Token> result = new();
+            bool commaExpected = false;
+
+            while (" \t\n".Contains(Current)) Advance();
+
+            if (Current == '}')
+            {
+                Advance();
+                
+                return new Token(Tokens.Dictionary, result);
+            }
+
+            while (Current != '\0' && Current != '}')
+            {
+                if (commaExpected)
+                {
+                    if (Current != ',') throw new CliexSyntaxError("Cannot generate dictionary: comma expected.");
+                    
+                    Advance();
+                    
+                    commaExpected = false;
+                    
+                    while (" \t\n".Contains(Current)) Advance();
+                    
+                    if (Current == '}') break;
+                }
+
+                Token key;
+                
+                if ((Alphas + "-_").Contains(Current)) key = GenerateIdentifier();
+                else if (Current == '\"')
+                {
+                    Advance();
+                    
+                    key = GenerateString();
+                }
+                else if (Digits.Contains(Current) || (Current == '.' && Index + 1 < Source.Length && Digits.Contains(Source[Index + 1]))) key = GenerateNumber();
+                else throw new CliexSyntaxError($"Invalid character for dictionary key: '{Current}'. Keys must be identifiers, strings, or numbers.");
+
+                while (" \t\n".Contains(Current)) Advance();
+
+                if (Current != ':') throw new CliexSyntaxError("Cannot generate dictionary: colon expected after key.");
+                
+                Advance();
+                
+                while (" \t\n".Contains(Current)) Advance();
+
+                Token value;
+                
+                if ((Alphas + "-_").Contains(Current)) value = GenerateIdentifier();
+                else if (Digits.Contains(Current) || (Current == '.' && Index + 1 < Source.Length && Digits.Contains(Source[Index + 1]))) value = GenerateNumber();
+                else if (Current == '\"')
+                {
+                    Advance();
+                    
+                    value = GenerateString();
+                }
+                else if (Current == '\'')
+                {
+                    Advance();
+                    
+                    value = GenerateChar();
+                }
+                else if (Current == '[')
+                {
+                    Advance();
+                    
+                    value = GenerateList();
+                }
+                else if (Current == '{')
+                {
+                    Advance();
+                    
+                    value = GenerateDictionary();
+                }
+                else if (Current == '$')
+                {
+                    Advance();
+                    
+                    value = GenerateVariable();
+                }
+                else throw new CliexSyntaxError($"Invalid character for dictionary value: '{Current}'.");
+
+                if (result.ContainsKey(key)) throw new CliexDuplicateKeyError($"Duplicate key '{key.Value}' found in dictionary.");
+
+                result.Add(key, value);
+                commaExpected = true;
+                while (" \t\n".Contains(Current)) Advance();
+            }
+
+            if (Current == '}') Advance();
+            else throw new CliexSyntaxError("Dictionary not properly closed: expected '}'.");
+
+            return new Token(Tokens.Dictionary, result);
+        }
+
+        public Token GenerateVariable()
+        {
+            string result = "";
+
+            while (Current != '\0' && Current != ' ')
+            {
+                result += Current;
+                
+                Advance();
+            }
+
+            return new(Tokens.Variable, Variables.GetVariable(result));
         }
     }
 }
