@@ -14,7 +14,7 @@ namespace Cliex
             List<Token> result = lexer.Analyse();
             JsonSerializerOptions options = new()
             {
-                Converters = { new JsonStringEnumConverter() },
+                Converters = { new JsonStringEnumConverter(), new JsonTokenConverter(), },
                 NumberHandling = JsonNumberHandling.AllowReadingFromString,
                 WriteIndented = true
             };
