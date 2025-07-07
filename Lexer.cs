@@ -6,25 +6,27 @@ namespace Cliex
     [Flags]
     public enum Tokens
     {
-        Identifier,
-        String,
-        Char,
-        Byte,
-        SByte,
-        UShort,
-        Short,
-        Int,
-        UInt,
-        Long,
-        ULong,
-        Float,
-        Double,
-        Decimal,
-        Boolean,
-        Null,
-        List,
-        Dictionary,
-        Variable,
+        Operator = 0,
+        Identifier = 1,
+        String = 2,
+        Char = 4,
+        Byte = 8,
+        SByte = 16,
+        UShort = 32,
+        Short = 64,
+        Int = 128,
+        UInt = 256,
+        Long = 512,
+        ULong = 1024,
+        Float = 2048,
+        Double = 4096,
+        Decimal = 8192,
+        Boolean = 16384,
+        Null = 32768,
+        List = 65536,
+        Dictionary = 131072,
+        Variable = 262144,
+        Function = 5124288
     }
 
     public class Token
@@ -68,6 +70,7 @@ namespace Cliex
     {
         private static string Alphas { get; } = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
         private static string Digits { get; } = "0123456789";
+        private static string Operators { get; } = "+-*/^%|&!";
         
         public string Source { get; private set; }
         public char Current { get; private set; }
@@ -103,6 +106,11 @@ namespace Cliex
                 else if (Digits.Contains(Current) || (Current == '.' && Digits.Contains(next)))
                 {
                     result.Add(GenerateNumber());
+                }
+                else if (Operators.Contains(Current))
+                {
+                    result.Add(new (Tokens.Operator, Current));
+                    Advance();
                 }
                 else if (Current == '\"')
                 {
