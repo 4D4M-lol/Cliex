@@ -9,7 +9,9 @@ namespace Cliex
     {
         public static void Main(string[] args)
         {
-            string source = "{\"A\": \"Apple\", \"B\": \"Banana\"}";
+            Variables.SetVariable("PI", double.Pi);
+            
+            string source = "$PI {\"A\": \"Apple\", \"B\": \"Banana\"}";
             Lexer lexer = new(source);
             List<Token> result = lexer.Analyse();
             JsonSerializerOptions options = new()

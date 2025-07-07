@@ -2,7 +2,7 @@
 {
     public static class Variables
     {
-        private static Dictionary<string, object?> Storage => new();
+        private static Dictionary<string, object?> Storage = new();
 
         public static void SetVariable(string name, object? value, bool update = true)
         {
@@ -13,12 +13,14 @@
 
         public static object? GetVariable(string name, object? def = null)
         {
-            return Storage[name.Replace(' ', '-')] ?? def;
+            Storage.TryGetValue(name, out object? value);
+
+            return value ?? def;
         }
 
         public static TValue? GetVariable<TValue>(string name, TValue? def = default)
         {
-            if (Storage[name.Replace(' ', '-')] is TValue value) return value;
+            if (Storage.TryGetValue(name, out object? value) is TValue ret) return ret;
 
             return def;
         }

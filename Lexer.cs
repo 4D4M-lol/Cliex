@@ -23,7 +23,8 @@ namespace Cliex
         Boolean,
         Null,
         List,
-        Dictionary
+        Dictionary,
+        Variable,
     }
 
     public class Token
@@ -122,6 +123,11 @@ namespace Cliex
                 {
                     Advance();
                     result.Add(GenerateDictionary());
+                }
+                else if (Current == '$')
+                {
+                    Advance();
+                    result.Add(GenerateVariable());
                 }
                 else if (" \t\n".Contains(Current)) Advance();
                 else throw new CliexSyntaxError($"Unknown character: \'{Current}\'.");
@@ -421,6 +427,11 @@ namespace Cliex
                     
                     commaExpected = true;
                 }
+                else if (Current == '$')
+                {
+                    Advance();
+                    result.Add(GenerateVariable());
+                }
                 else if (" \t\n".Contains(Current)) 
                 {
                     Advance();
@@ -512,6 +523,12 @@ namespace Cliex
                     
                     value = GenerateDictionary();
                 }
+                else if (Current == '$')
+                {
+                    Advance();
+                    
+                    value = GenerateVariable();
+                }
                 else throw new CliexSyntaxError($"Invalid character for dictionary value: '{Current}'.");
 
                 if (result.ContainsKey(key)) throw new CliexDuplicateKeyError($"Duplicate key '{key.Value}' found in dictionary.");
@@ -525,6 +542,20 @@ namespace Cliex
             else throw new CliexSyntaxError("Dictionary not properly closed: expected '}'.");
 
             return new Token(Tokens.Dictionary, result);
+        }
+
+        public Token GenerateVariable()
+        {
+            string result = "";
+
+            while (Current != '\0' && Current != ' ')
+            {
+                result += Current;
+                
+                Advance();
+            }
+
+            return new(Tokens.Variable, Variables.GetVariable(result));
         }
     }
 }
