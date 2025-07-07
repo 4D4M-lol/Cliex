@@ -9,7 +9,7 @@ namespace Cliex
     {
         public static void Main(string[] args)
         {
-            string source = "cliex \"Hello, World!\" \'1\' 123456 123.456 true false [123, 456.789, \'a\']";
+            string source = "{\"A\": \"Apple\", \"B\": \"Banana\"}";
             Lexer lexer = new(source);
             List<Token> result = lexer.Analyse();
             JsonSerializerOptions options = new()
